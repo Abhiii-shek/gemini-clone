@@ -61,3 +61,10 @@ npm install
 
 # 3. Run dev server
 npm run dev
+```
+##Screenshots
+
+
+<img width="1352" height="595" alt="gemini-1" src="https://github.com/user-attachments/assets/37be1604-28e0-4e51-bbda-1a2d99259854" />
+<img width="1358" height="216" alt="gemini-2" src="https://github.com/user-attachments/assets/097dc7a2-9a9a-471f-a83d-6b9d0784b06e" />
+<img width="1298" height="574" alt="GEMINI-3" src="https://github.com/user-attachments/assets/9fd45bb1-1ce1-49b0-890b-f30091e0ad55" />
