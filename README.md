@@ -5,7 +5,7 @@ A full-stack Gemini-inspired frontend clone built with **Next.js 15**, **Tailwin
 ## 🌐 Live Demo
 
 🔗 [Live Site](https://gemini-clone-562othte7-rajbharabhishek84912-gmailcoms-projects.vercel.app)  
-*(Replace with your actual Vercel/Netlify/GitHub Pages link)*
+
 
 ---
 
