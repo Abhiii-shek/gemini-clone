@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { Toaster } from "react-hot-toast";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -25,10 +26,32 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
+     
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        
+        <Toaster/>
         {children}
       </body>
     </html>
   );
+}
+
+function DarkModeScript() {
+  return (
+    <script
+      dangerouslySetInnerHTML={{
+        __html: `
+          if (
+            localStorage.theme === 'dark' ||
+            (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          ) {
+            document.documentElement.classList.add('dark')
+          } else {
+            document.documentElement.classList.remove('dark')
+          }
+        `,
+      }}
+    />
+  )
 }
