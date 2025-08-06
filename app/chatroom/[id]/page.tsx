@@ -1,136 +1,215 @@
 'use client'
 
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import * as z from 'zod'
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
+import { useParams } from 'next/navigation'
+import { useMessageStore, Message } from '@/store/chatStore'
 import toast from 'react-hot-toast'
-import { useAuthStore } from '@/store/authStore'
+import { useRouter } from 'next/navigation'
 
-// ------------------ Schema ------------------
-const loginSchema = z.object({
-  countryCode: z.string().min(1, 'Country code is required'),
-  phone: z.string().min(10, 'Phone number must be at least 10 digits'),
-  name: z.string().min(1, 'Name is required'),
-  otp: z.string().optional(),
-})
-type LoginFormData = z.infer<typeof loginSchema>
+export default function ChatroomPage() {
+  const { id } = useParams<{ id: string }>()
+  const { messages, addMessage, loadInitialMessages, loadMoreMessages } = useMessageStore()
 
-// ------------------ Types ------------------
-type Country = {
-  name: string
-  dialCode: string
-}
+  const [input, setInput] = useState('')
+  const [isTyping, setIsTyping] = useState(false)
+  const [isFetchingMore, setIsFetchingMore] = useState(false)
 
-// ------------------ Component ------------------
-export default function LoginPage() {
-  const [step, setStep] = useState<1 | 2>(1)
-  const [countries, setCountries] = useState<Country[]>([])
-  const { login } = useAuthStore()
-  const router = useRouter()
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const bottomRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const { register, handleSubmit } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
-  })
-
-  // ------------------ Static country list ------------------
+  // 🟢 Load dummy initial messages
   useEffect(() => {
-    setCountries([
-      { name: 'India', dialCode: '+91' },
-      { name: 'United States', dialCode: '+1' },
-      { name: 'United Kingdom', dialCode: '+44' },
-      { name: 'Canada', dialCode: '+1' },
-      { name: 'Australia', dialCode: '+61' },
-      { name: 'Germany', dialCode: '+49' },
-      { name: 'France', dialCode: '+33' },
-      { name: 'Japan', dialCode: '+81' },
-      { name: 'South Korea', dialCode: '+82' },
-      { name: 'UAE', dialCode: '+971' },
-      { name: 'Singapore', dialCode: '+65' },
-    ])
+    loadInitialMessages()
   }, [])
 
-  // ------------------ Form submission ------------------
-  const onSubmit = (data: LoginFormData) => {
-    if (step === 1) {
-      toast.success(`OTP sent to ${data.countryCode} ${data.phone}`)
-      setStep(2)
-    } else {
+  // 🟢 Scroll to bottom if user is near bottom
+  useEffect(() => {
+    if (isNearBottom()) {
+      scrollToBottom()
+    }
+  }, [messages])
+
+  const scrollToBottom = () => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  const isNearBottom = (): boolean => {
+    const container = scrollContainerRef.current
+    if (!container) return false
+    return container.scrollHeight - container.scrollTop - container.clientHeight < 100
+  }
+
+  const handleScroll = () => {
+    const container = scrollContainerRef.current
+    if (!container || isFetchingMore) return
+
+    if (container.scrollTop === 0) {
+      setIsFetchingMore(true)
+      const prevHeight = container.scrollHeight
+
       setTimeout(() => {
-        login(data.phone)
-        toast.success('Logged in successfully')
-        router.push('/dashboard')
-      }, 1000)
+        loadMoreMessages()
+        requestAnimationFrame(() => {
+          const newHeight = container.scrollHeight
+          container.scrollTop = newHeight - prevHeight
+          setIsFetchingMore(false)
+        })
+      }, 500)
     }
   }
 
+  const handleSend = () => {
+    if (!input.trim()) return
+
+    const newMsg: Message = {
+      id: crypto.randomUUID(),
+      text: input.trim(),
+      sender: 'user',
+      timestamp: Date.now(),
+    }
+    addMessage(newMsg)
+    setInput('')
+
+    // Scroll after next paint
+    requestAnimationFrame(() => scrollToBottom())
+
+    // Simulate Gemini reply
+    setIsTyping(true)
+    setTimeout(() => {
+      addMessage({
+        id: crypto.randomUUID(),
+        text: 'Gemini simulated reply.',
+        sender: 'gemini',
+        timestamp: Date.now(),
+      })
+      setIsTyping(false)
+    }, 1500)
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const base64 = reader.result?.toString()
+      if (base64) {
+        addMessage({
+          id: crypto.randomUUID(),
+          image: base64,
+          sender: 'user',
+          timestamp: Date.now(),
+        })
+
+        toast.success('Image uploaded')
+        scrollToBottom()
+
+        setIsTyping(true)
+        setTimeout(() => {
+          addMessage({
+            id: crypto.randomUUID(),
+            text: 'Gemini received your image.',
+            sender: 'gemini',
+            timestamp: Date.now(),
+          })
+          setIsTyping(false)
+        }, 1200)
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleCopy = (text?: string) => {
+    if (!text) return
+    navigator.clipboard.writeText(text)
+    toast.success('Copied to clipboard')
+  }
+  const router = useRouter()
+
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-100">
-      <form
-        onSubmit={handleSubmit(onSubmit)}
-        className="bg-white p-6 rounded-md shadow-md w-full max-w-md"
+    <main className="p-4 max-w-2xl mx-auto">
+      <div className="mt-4 text-center">
+  <button
+    onClick={() => router.push('/dashboard')}
+    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
+  >
+    Go to Dashboard
+  </button>
+</div>
+      <h1 className="text-xl font-bold mb-4">Chatroom ID: {id}</h1>
+
+      {/* Chat scroll area */}
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="border rounded-md h-[60vh] overflow-y-auto p-2 flex flex-col"
       >
-        <h1 className="text-2xl font-bold mb-6 text-center">OTP Login</h1>
-
-        {/* Country Code */}
-        <label className="block text-sm mb-1">Country Code</label>
-        <select
-          {...register('countryCode')}
-          defaultValue=""
-          className="w-full border p-2 mb-4 rounded"
-        >
-          <option value="" disabled>
-            Select your country
-          </option>
-          {countries.map((country) => (
-            <option
-              key={`${country.name}-${country.dialCode}`}
-              value={country.dialCode}
-            >
-              {country.name} ({country.dialCode})
-            </option>
-          ))}
-        </select>
-
-        {/* Phone Number */}
-        <label className="block text-sm mb-1">Phone Number</label>
-        <input
-          {...register('phone')}
-          type="tel"
-          placeholder="Enter your phone number"
-          className="w-full border p-2 mb-4 rounded"
-        />
-
-        {/* Name */}
-        <label className="block text-sm mb-1">Name</label>
-        <input
-          {...register('name')}
-          type="text"
-          placeholder="Enter your name"
-          className="w-full border p-2 mb-4 rounded"
-        />
-
-        {/* OTP (only in step 2) */}
-        {step === 2 && (
-          <>
-            <label className="block text-sm mb-1">OTP</label>
-            <input
-              {...register('otp')}
-              type="text"
-              placeholder="Enter OTP"
-              className="w-full border p-2 mb-4 rounded"
-            />
-          </>
+        {isFetchingMore && (
+          <div className="text-sm text-gray-500 text-center mb-2">Loading older messages...</div>
         )}
 
-        <button
-          type="submit"
-          className="bg-blue-600 text-white font-medium py-2 w-full rounded hover:bg-blue-700 transition"
-        >
-          {step === 1 ? 'Send OTP' : 'Login'}
+        {messages.map((msg) => (
+          <div
+            key={msg.id}
+            className={`mb-2 p-2 rounded-md max-w-[75%] ${
+              msg.sender === 'user'
+                ? 'bg-blue-100 self-end text-right'
+                : 'bg-gray-200 self-start text-left'
+            }`}
+          >
+            {msg.image && (
+              <img src={msg.image} alt="uploaded" className="mb-1 max-w-full rounded" />
+            )}
+            {msg.text && (
+              <p
+                onClick={() => handleCopy(msg.text)}
+                className="cursor-pointer"
+                title="Click to copy"
+              >
+                {msg.text}
+              </p>
+            )}
+            <small className="text-xs text-gray-500 block mt-1">
+              {new Date(msg.timestamp).toLocaleTimeString()}
+            </small>
+          </div>
+        ))}
+
+        {isTyping && (
+          <div className="text-sm text-gray-500 my-2">Gemini is typing...</div>
+        )}
+
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input area */}
+      <div className="mt-4 flex gap-2 items-center">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          className="border p-2 flex-1 rounded"
+          placeholder="Type a message..."
+        />
+        <button onClick={handleSend} className="bg-blue-600 text-white px-4 py-2 rounded">
+          Send
         </button>
-      </form>
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="bg-gray-200 px-3 py-2 rounded"
+        >
+          📷
+        </button>
+        <input
+        title='name'
+          type="file"
+          accept="image/*"
+          ref={fileInputRef}
+          className="hidden"
+          onChange={handleFileChange}
+        />
+      </div>
     </main>
   )
 }
